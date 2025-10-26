@@ -11,7 +11,5 @@
     "build:tauri": "cd apps/desktop && npm install && npm run tauri build",
     "lint": "cd apps/frontend && npm run lint",
     "test": "cd apps/backend && npm run test"
-  },
-  "dependencies": {},
-  "devDependencies": {}
+  }
 }

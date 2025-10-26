@@ -1,12 +1,16 @@
 import { FC } from "react";
+import { useTransferStore } from "../store/transfers";
 
 export const StatusBar: FC = () => {
-  type ConnectionStatus = "Connected" | "Disconnected";
-  type LiveUpdates = "ON" | "OFF";
+  const { unlisten, transfers } = useTransferStore();
 
-  const STATUS: ConnectionStatus = "Connected";
-  const LIVE_UPDATES: LiveUpdates = "ON";
-  const LAST_BLOCK = 18392010;
+  const STATUS: "Connected" | "Disconnected" = unlisten
+    ? "Connected"
+    : "Disconnected";
+  const LIVE_UPDATES: "ON" | "OFF" = unlisten ? "ON" : "OFF";
+  const LAST_BLOCK = transfers.length
+    ? transfers[transfers.length - 1].time
+    : "—";
 
   const statusColor = STATUS === "Connected" ? "bg-green-500" : "bg-red-500";
 

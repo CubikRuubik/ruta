@@ -1,5 +1,5 @@
 import { FC } from "react";
-import { tokenColors, transfers } from "../mocks/transfers";
+import { tokenColors } from "../mocks/transfers";
 import { useFilterStore } from "../store/filters";
 import {
   Table,
@@ -9,9 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/Table";
+import { useTransferStore } from "../store/transfers";
 
 export const TransfersTable: FC = () => {
   const { token: selectedToken } = useFilterStore();
+  const { transfers } = useTransferStore();
 
   const filteredTransfers = transfers.filter(
     (t) => selectedToken === "All" || t.token === selectedToken
