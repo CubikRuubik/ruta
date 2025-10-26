@@ -1753,9 +1753,11 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
 name = "database"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "alloy",
+ "bigdecimal",
+ "hex",
  "serde",
  "serde_json",
  "sqlx",
@@ -3149,6 +3151,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.108",
+]
+
+[[package]]
+name = "indexer"
+version = "1.0.0"
+dependencies = [
+ "alloy",
+ "database",
+ "sqlx",
+ "thiserror 2.0.17",
+ "tokio",
+ "tower",
 ]
 
 [[package]]
@@ -5130,6 +5144,12 @@ dependencies = [
 [[package]]
 name = "ruta"
 version = "0.1.0"
+dependencies = [
+ "alloy",
+ "database",
+ "indexer",
+ "tokio",
+]
 
 [[package]]
 name = "ryu"
@@ -6511,7 +6531,9 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
@@ -6696,8 +6718,10 @@ dependencies = [
  "pin-project-lite",
  "sync_wrapper",
  "tokio",
+ "tokio-util",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
