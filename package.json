@@ -1,0 +1,15 @@
+{
+  "name": "ruta-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:backend && npm run dev:tauri",
+    "dev:backend": "cd apps/backend && cargo run",
+    "dev:tauri": "cd apps/desktop && npm install && npm run tauri dev",
+    "build": "npm run build:backend && npm run build:tauri",
+    "build:backend": "cd apps/backend && cargo build --release",
+    "build:tauri": "cd apps/desktop && npm install && npm run tauri build",
+    "lint": "cd apps/frontend && npm run lint",
+    "test": "cd apps/backend && npm run test"
+  }
+}

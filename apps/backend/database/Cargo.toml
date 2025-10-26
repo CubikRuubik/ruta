@@ -1,0 +1,13 @@
+[package]
+name = "database"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+alloy = { workspace = true }
+bigdecimal = "0.4"
+hex = "0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
