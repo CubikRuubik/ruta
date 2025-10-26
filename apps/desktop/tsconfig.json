@@ -7,8 +7,9 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -22,6 +23,11 @@
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }],
-  "types": ["node", "./src/types/tailwindcss-vite.d.ts", "tailwindcss"],
+  "types": [
+    "node",
+    "./src/types/tailwindcss-vite.d.ts",
+    "tailwindcss",
+    "@tauri-apps/api"
+  ],
   "files": []
 }
