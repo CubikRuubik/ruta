@@ -1,42 +1,72 @@
-use sqlx::{Executor, Postgres, types::chrono};
+use alloy::primitives::Address;
+use serde::{Deserialize, Serialize};
+use sqlx::{Pool, Postgres, query, query_as};
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(Debug, sqlx::FromRow)]
 pub struct EvmChains {
     pub id: i64,
     pub name: String,
-    pub last_synced_block_number: i64,
-    pub block_time: i32,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub rpc_url: Option<String>,
+    pub block_time: Option<i32>,
 }
 
 impl EvmChains {
-    pub async fn fetch_by_id<'c, E>(id: u64, connection: E) -> Result<EvmChains, sqlx::Error>
-    where
-        E: Executor<'c, Database = Postgres>,
-    {
-        let query = "SELECT * FROM evm_chains WHERE id = $1";
-
-        sqlx::query_as::<_, EvmChains>(query)
-            .bind(id as i64)
-            .fetch_one(connection)
-            .await
+    pub async fn fetch_by_id(id: u64, pool: &Pool<Postgres>) -> Result<Self, sqlx::Error> {
+        query_as!(
+            EvmChains,
+            "SELECT id, name, rpc_url, block_time FROM evm_chains WHERE id = $1",
+            id as i64
+        )
+        .fetch_one(pool)
+        .await
     }
 
-    pub async fn update_last_synced_block_number<'c, E>(
-        &self,
-        block_number: u64,
-        connection: E,
-    ) -> Result<EvmChains, sqlx::Error>
-    where
-        E: Executor<'c, Database = Postgres>,
-    {
-        let query = "UPDATE evm_chains SET last_synced_block_number = $1 WHERE id = $2 RETURNING *";
+    pub async fn find_all(pool: &Pool<Postgres>) -> Result<Vec<Self>, sqlx::Error> {
+        query_as!(
+            EvmChains,
+            "SELECT id, name, rpc_url, block_time FROM evm_chains"
+        )
+        .fetch_all(pool)
+        .await
+    }
 
-        sqlx::query_as::<_, EvmChains>(query)
-            .bind(block_number as i64)
-            .bind(self.id)
-            .fetch_one(connection)
-            .await
+    pub async fn create(
+        id: i64,
+        name: &str,
+        rpc_url: Option<&str>,
+        block_time: Option<i32>,
+        pool: &Pool<Postgres>,
+    ) -> Result<Self, sqlx::Error> {
+        query_as!(
+            EvmChains,
+            "INSERT INTO evm_chains (id, name, rpc_url, block_time) VALUES ($1, $2, $3, $4) RETURNING id, name, rpc_url, block_time",
+            id,
+            name,
+            rpc_url,
+            block_time
+        )
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn upsert(
+        id: i64,
+        name: &str,
+        rpc_url: Option<&str>,
+        block_time: Option<i32>,
+        pool: &Pool<Postgres>,
+    ) -> Result<Self, sqlx::Error> {
+        query_as!(
+            EvmChains,
+            "INSERT INTO evm_chains (id, name, rpc_url, block_time) VALUES ($1, $2, $3, $4)
+             ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, rpc_url = EXCLUDED.rpc_url, block_time = EXCLUDED.block_time
+             RETURNING id, name, rpc_url, block_time",
+            id,
+            name,
+            rpc_url,
+            block_time
+        )
+        .fetch_one(pool)
+        .await
     }
 }

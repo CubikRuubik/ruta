@@ -1,66 +1,33 @@
-CREATE TABLE IF NOT EXISTS evm_chains
-(
+CREATE TABLE IF NOT EXISTS evm_chains (
     id BIGINT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    last_synced_block_number BIGINT NULL,
-    block_time INTEGER NOT NULL,
-
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+    name VARCHAR(50) NOT NULL,
+    rpc_url TEXT,
+    block_time INTEGER
 );
 
-CREATE UNLOGGED TABLE IF NOT EXISTS evm_logs
-(
-    id SERIAL PRIMARY KEY,
-    chain_id BIGINT NOT NULL REFERENCES evm_chains(id),
-    block_number NUMERIC NOT NULL,
-    block_hash BYTEA NOT NULL,
-    address BYTEA NOT NULL,
-    transaction_hash BYTEA NOT NULL,
-    transaction_index BIGINT NOT NULL,
-    log_index BIGINT NOT NULL,
-    removed BOOL DEFAULT FALSE,
-    data BYTEA,
-    event_signature BYTEA,
-    topics BYTEA[],
-
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS evm_sync_logs
-(
-    address BYTEA PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS evm_sync_logs (
+    contract_address VARCHAR(42) NOT NULL PRIMARY KEY,
     last_synced_block_number BIGINT NOT NULL DEFAULT 0,
-
-    chain_id BIGINT NOT NULL REFERENCES evm_chains(id),
-
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+    chain_id BIGINT NOT NULL REFERENCES evm_chains(id)
 );
 
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_evm_chains_updated_at
-BEFORE UPDATE ON evm_chains
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_evm_sync_logs_updated_at
-BEFORE UPDATE ON evm_sync_logs
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
-
-
-CREATE UNIQUE INDEX
-  evm_logs_unique_on_chain_transaction_log_index
-ON evm_logs (
-  chain_id,
-  transaction_hash,
-  log_index
+CREATE TABLE IF NOT EXISTS token_transfers (
+    id BIGSERIAL PRIMARY KEY,
+    block_number BIGINT NOT NULL,
+    transaction_hash BYTEA NOT NULL,
+    log_index INTEGER NOT NULL,
+    from_address BYTEA NOT NULL,
+    to_address BYTEA NOT NULL,
+    amount DECIMAL(78,0) NOT NULL,
+    contract_address VARCHAR(42) NOT NULL REFERENCES evm_sync_logs(contract_address),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(transaction_hash, log_index)
 );
+
+CREATE INDEX idx_token_transfers_contract ON token_transfers(contract_address);
+CREATE INDEX idx_token_transfers_block ON token_transfers(block_number);
+CREATE INDEX idx_token_transfers_from ON token_transfers(from_address);
+CREATE INDEX idx_token_transfers_to ON token_transfers(to_address);
+CREATE INDEX idx_token_transfers_tx_hash ON token_transfers(transaction_hash);
+
+CREATE INDEX idx_token_transfers_contract_block ON token_transfers(contract_address, block_number DESC);
