@@ -11,3 +11,11 @@ database = { path = '../database', version = '1.0.0' }
 thiserror = { workspace = true }
 tower = { version = '0.5.1', features = ['limit', 'util'] }
 sqlx = { workspace = true }
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tokio-stream = "0.1"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+dotenvy = "0.15"

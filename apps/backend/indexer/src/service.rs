@@ -17,20 +17,23 @@ use database::entity::{
     erc20_transfers::Erc20Transfers, evm_chains::EvmChains, evm_sync_logs::EvmSyncLogs,
 };
 use sqlx::{Pool, Postgres};
+use tokio::sync::broadcast;
 use tokio::time::{sleep, Duration};
 use tower::Service;
 
-use crate::{erc20::Erc20Transfer, error::AppError};
+use crate::erc20::Erc20Transfer;
+use crate::error::AppError;
 
 pub struct ListenerService {
     pub chain_id: u64,
     pub address: String,
     pub db_pool: Pool<Postgres>,
+    pub transfer_tx: broadcast::Sender<Erc20Transfer>,
 }
 
 impl Service<()> for ListenerService {
     type Response = ();
-    type Error = Box<dyn Error>;
+    type Error = Box<dyn Error + Send + Sync>;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -41,8 +44,9 @@ impl Service<()> for ListenerService {
         let db_pool = self.db_pool.clone();
         let chain_id = self.chain_id;
         let address = self.address.clone();
+        let transfer_tx = self.transfer_tx.clone();
 
-        Box::pin(async move { fetch_and_save_logs(chain_id, db_pool, address).await })
+        Box::pin(async move { fetch_and_save_logs(chain_id, db_pool, address, transfer_tx).await })
     }
 }
 
@@ -50,7 +54,8 @@ pub async fn fetch_and_save_logs(
     chain_id: u64,
     db_pool: Pool<Postgres>,
     address: String,
-) -> Result<(), Box<dyn Error>> {
+    transfer_tx: broadcast::Sender<Erc20Transfer>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     loop {
         // Get RPC URL from database for the specified chain
         let chain = EvmChains::fetch_by_id(chain_id, &db_pool).await?;
@@ -118,6 +123,9 @@ pub async fn fetch_and_save_logs(
                 )
                 .await
                 .inspect_err(|error| eprintln!("Error saving ERC-20 transfer {error}"));
+
+                // Send the transfer to the broadcast channel for real-time updates
+                let _ = transfer_tx.send(transfer.clone());
             }
         }
 

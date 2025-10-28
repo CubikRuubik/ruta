@@ -1,10 +1,10 @@
 use alloy::{
-    dyn_abi::DynSolEvent,
     primitives::{Address, U256},
     rpc::types::Log,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc20Transfer {
     pub from: Address,
     pub to: Address,

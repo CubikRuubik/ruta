@@ -50,6 +50,8 @@ pub async fn initialize_database() -> Result<Pool<Postgres>, sqlx::Error> {
 
     let pool = create_pool(db_max_connections).await.unwrap();
 
+    seed_database(&pool).await?;
+
     Ok(pool)
 }
 
