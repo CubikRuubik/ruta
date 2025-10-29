@@ -6,7 +6,6 @@ use axum::{
     routing::get,
     Router,
 };
-use database::entity::erc20_transfers::Erc20Transfers;
 use futures::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
 use sqlx::Pool;
@@ -14,15 +13,15 @@ use std::{convert::Infallible, time::Duration};
 use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
 
-use crate::erc20::Erc20Transfer;
+use database::entity::erc20_transfers::Erc20Transfers;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: Pool<sqlx::Postgres>,
-    pub transfer_tx: broadcast::Sender<Erc20Transfer>,
+    pub transfer_tx: broadcast::Sender<TransferResponse>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TransferResponse {
     pub id: i64,
     pub block_number: i64,

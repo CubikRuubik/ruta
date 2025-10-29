@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let db_pool = initialize_database().await.unwrap();
 
-    let (transfer_tx, _) = broadcast::channel::<erc20::Erc20Transfer>(100);
+    let (transfer_tx, _) = broadcast::channel::<server::TransferResponse>(100);
 
     let app_state = server::AppState {
         db_pool: db_pool.clone(),

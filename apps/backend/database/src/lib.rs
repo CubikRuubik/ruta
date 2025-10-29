@@ -1,6 +1,6 @@
 use std::env;
 
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use sqlx::{Pool, Postgres, migrate::Migrator, postgres::PgPoolOptions};
 
 pub mod entity;
 
@@ -16,6 +16,12 @@ async fn create_pool(max_connections: u32) -> Result<Pool<Postgres>, sqlx::Error
         .max_connections(max_connections)
         .connect(&database_url)
         .await
+}
+
+async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
+    let migrator = Migrator::new(std::path::Path::new("./migrations")).await?;
+    migrator.run(pool).await?;
+    Ok(())
 }
 
 pub struct Database {
@@ -77,4 +83,5 @@ async fn seed_database(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
 // SELECT * FROM token_transfers;
 // SELECT * FROM evm_sync_logs;
 // psql -U ppp -d indexer_db -c "TRUNCATE TABLE evm_chains, evm_sync_logs, token_transfers RESTART IDENTITY CASCADE;"
+// cargo sqlx migrate run --database-url "postgresql://ppp@localhost/indexer_db"
 // export DATABASE_URL="postgresql://ppp@localhost/indexer_db"

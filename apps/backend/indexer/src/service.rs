@@ -24,12 +24,13 @@ use tower::Service;
 
 use crate::erc20::Erc20Transfer;
 use crate::error::AppError;
+use crate::server::TransferResponse;
 
 pub struct ListenerService {
     pub chain_id: u64,
     pub address: String,
     pub db_pool: Pool<Postgres>,
-    pub transfer_tx: broadcast::Sender<Erc20Transfer>,
+    pub transfer_tx: broadcast::Sender<TransferResponse>,
 }
 
 impl Service<()> for ListenerService {
@@ -109,7 +110,7 @@ pub async fn fetch_and_save_logs(
     chain_id: u64,
     db_pool: Pool<Postgres>,
     address: String,
-    transfer_tx: broadcast::Sender<Erc20Transfer>,
+    transfer_tx: broadcast::Sender<TransferResponse>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     loop {
         let chain = EvmChains::fetch_by_id(chain_id, &db_pool).await?;
@@ -166,7 +167,7 @@ pub async fn fetch_and_save_logs(
 
                 let adjusted_amount = transfer.amount / U256::from(10u64.pow(decimals as u32)); // U256::from(6);
 
-                let _ = Erc20Transfers::create(
+                let transfer_record = Erc20Transfers::create(
                     block_number,
                     transaction_hash.to_vec().try_into().map_err(|_| {
                         std::io::Error::new(
@@ -183,7 +184,29 @@ pub async fn fetch_and_save_logs(
                 .await
                 .inspect_err(|error| eprintln!("Error saving ERC-20 transfer {error}"));
 
-                let _ = transfer_tx.send(transfer.clone());
+                if let Ok(_transfer_record) = transfer_record {
+                    let created_transfers =
+                        Erc20Transfers::find_by_contract_address(&address, 1, &db_pool)
+                            .await
+                            .unwrap_or_default();
+
+                    if let Some(latest_transfer) = created_transfers.first() {
+                        let transfer_response = TransferResponse {
+                            id: latest_transfer.id,
+                            block_number: latest_transfer.block_number,
+                            transaction_hash: hex::encode(&latest_transfer.transaction_hash),
+                            log_index: latest_transfer.log_index,
+                            from_address: hex::encode(&latest_transfer.from_address),
+                            to_address: hex::encode(&latest_transfer.to_address),
+                            amount: (latest_transfer.amount.clone()
+                                / sqlx::types::BigDecimal::from(10u64.pow(decimals as u32)))
+                            .to_string(),
+                            contract_address: latest_transfer.contract_address.clone(),
+                            created_at: latest_transfer.created_at.map(|dt| dt.to_rfc3339()),
+                        };
+                        let _ = transfer_tx.send(transfer_response);
+                    }
+                }
             }
         }
 
