@@ -70,6 +70,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/transfers/stream", get(stream_transfers))
         .route("/tokens/:address/summary", get(get_token_summary))
         .route("/tokens/:address/symbol", get(get_token_symbol_endpoint))
+        .route("/tokens/summaries", get(get_all_token_summaries))
         .with_state(state)
 }
 
@@ -82,6 +83,35 @@ async fn get_transfers(
 
     let response = transfers.into_iter().map(TransferResponse::from).collect();
     Ok(Json(response))
+}
+
+async fn get_all_token_summaries(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TokenSummaryResponse>>, StatusCode> {
+    use database::entity::evm_sync_logs::EvmSyncLogs;
+
+    let addresses = EvmSyncLogs::find_all_addresses(&state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut summaries = Vec::new();
+    for address in addresses {
+        let total = Erc20Transfers::sum_amounts_by_contract_address(&address, &state.db_pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+            .await
+            .ok();
+
+        summaries.push(TokenSummaryResponse {
+            contract_address: address,
+            total_transferred: total.to_string(),
+            symbol,
+        });
+    }
+
+    Ok(Json(summaries))
 }
 
 async fn get_token_symbol_endpoint(

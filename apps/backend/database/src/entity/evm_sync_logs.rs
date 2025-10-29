@@ -80,4 +80,10 @@ impl EvmSyncLogs {
         .fetch_one(pool)
         .await
     }
+
+    pub async fn find_all_addresses(pool: &Pool<Postgres>) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar!("SELECT DISTINCT contract_address FROM evm_sync_logs")
+            .fetch_all(pool)
+            .await
+    }
 }
