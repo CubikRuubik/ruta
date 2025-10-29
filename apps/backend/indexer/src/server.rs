@@ -35,6 +35,12 @@ pub struct TransferResponse {
     pub created_at: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct TokenSummaryResponse {
+    pub contract_address: String,
+    pub total_transferred: String,
+}
+
 impl From<Erc20Transfers> for TransferResponse {
     fn from(transfer: Erc20Transfers) -> Self {
         Self {
@@ -55,6 +61,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/transfers", get(get_transfers))
         .route("/transfers/stream", get(stream_transfers))
+        .route("/tokens/:address/summary", get(get_token_summary))
         .with_state(state)
 }
 
@@ -88,4 +95,19 @@ async fn stream_transfers(
             .interval(Duration::from_secs(1))
             .text("keep-alive"),
     )
+}
+
+async fn get_token_summary(
+    axum::extract::Path(address): axum::extract::Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<TokenSummaryResponse>, StatusCode> {
+    let total = Erc20Transfers::sum_amounts_by_contract_address(&address, &state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let response = TokenSummaryResponse {
+        contract_address: address,
+        total_transferred: total.to_string(),
+    };
+    Ok(Json(response))
 }

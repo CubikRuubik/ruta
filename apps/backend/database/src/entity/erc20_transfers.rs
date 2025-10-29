@@ -70,4 +70,18 @@ impl Erc20Transfers {
         .fetch_all(pool)
         .await
     }
+
+    pub async fn sum_amounts_by_contract_address(
+        contract_address: &str,
+        pool: &Pool<Postgres>,
+    ) -> Result<BigDecimal, sqlx::Error> {
+        let result: Option<BigDecimal> = sqlx::query_scalar!(
+            "SELECT COALESCE(SUM(amount), 0) FROM token_transfers WHERE contract_address = $1",
+            contract_address
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(result.unwrap_or_else(|| BigDecimal::from(0)))
+    }
 }
