@@ -40,6 +40,7 @@ pub struct TokenSummaryResponse {
     pub contract_address: String,
     pub total_transferred: String,
     pub symbol: Option<String>,
+    pub decimals: Option<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -103,11 +104,15 @@ async fn get_all_token_summaries(
         let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
             .await
             .ok();
+        let decimals = crate::service::get_token_decimals(1, &address, &state.db_pool)
+            .await
+            .ok();
 
         summaries.push(TokenSummaryResponse {
             contract_address: address,
             total_transferred: total.to_string(),
             symbol,
+            decimals,
         });
     }
 
@@ -161,11 +166,15 @@ async fn get_token_summary(
     let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
         .await
         .ok();
+    let decimals = crate::service::get_token_decimals(1, &address, &state.db_pool)
+        .await
+        .ok();
 
     let response = TokenSummaryResponse {
         contract_address: address,
         total_transferred: total.to_string(),
         symbol,
+        decimals,
     };
     Ok(Json(response))
 }

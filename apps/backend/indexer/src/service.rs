@@ -55,6 +55,7 @@ alloy::sol! {
     #[sol(rpc)]
     interface IERC20 {
         function symbol() external view returns (string);
+        function decimals() external view returns (uint8);
     }
 }
 
@@ -78,6 +79,30 @@ pub async fn get_token_symbol(
 
     let result = provider.call(&tx).await?;
     let decoded = IERC20::symbolCall::abi_decode_returns(&result, true)?;
+    Ok(decoded._0)
+}
+
+pub async fn get_token_decimals(
+    chain_id: u64,
+    contract_address: &str,
+    db_pool: &Pool<Postgres>,
+) -> Result<u8, Box<dyn Error + Send + Sync>> {
+    let chain = EvmChains::fetch_by_id(chain_id, db_pool).await?;
+    let rpc_url = chain
+        .rpc_url
+        .ok_or_else(|| AppError::MissingEnvVar("RPC_URL for chain".into()))?;
+
+    let provider = ProviderBuilder::new().on_builtin(&rpc_url).await?;
+    let contract = Address::from_str(contract_address)?;
+
+    let decimals_call = IERC20::decimalsCall {};
+    let tx = TransactionRequest::default()
+        .to(contract)
+        .input(decimals_call.abi_encode().into());
+
+    let result = provider.call(&tx).await?;
+    let decoded = IERC20::decimalsCall::abi_decode_returns(&result, true)?;
+    println!("got response: {} decimals", contract_address);
     Ok(decoded._0)
 }
 
@@ -126,6 +151,10 @@ pub async fn fetch_and_save_logs(
         let mut tx = db_pool.begin().await?;
         let contract_address = Address::from_str(&address)?;
 
+        let decimals = get_token_decimals(chain_id, &address, &db_pool)
+            .await
+            .unwrap_or(18);
+
         for log in logs {
             if let Some(transfer) = Erc20Transfer::from_log(&log) {
                 let block_number = log.block_number.ok_or_else(|| {
@@ -135,6 +164,8 @@ pub async fn fetch_and_save_logs(
                 let transaction_hash = log.transaction_hash.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing transaction hash")
                 })?;
+
+                let adjusted_amount = transfer.amount / U256::from(10u64.pow(decimals as u32)); // U256::from(6);
 
                 let _ = Erc20Transfers::create(
                     block_number,
@@ -146,7 +177,7 @@ pub async fn fetch_and_save_logs(
                     })?,
                     transfer.from.to_vec(),
                     transfer.to.to_vec(),
-                    transfer.amount,
+                    adjusted_amount,
                     contract_address,
                     &mut tx,
                 )
