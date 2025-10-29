@@ -102,7 +102,6 @@ pub async fn get_token_decimals(
 
     let result = provider.call(&tx).await?;
     let decoded = IERC20::decimalsCall::abi_decode_returns(&result, true)?;
-    println!("got response: {} decimals", contract_address);
     Ok(decoded._0)
 }
 
