@@ -1,6 +1,4 @@
-use alloy::primitives::Address;
-use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Postgres, query, query_as};
+use sqlx::{Pool, Postgres, query_as};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct EvmChains {

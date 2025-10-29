@@ -9,9 +9,10 @@ use std::{
 
 use alloy::{
     eips::BlockNumberOrTag,
-    primitives::Address,
+    primitives::{Address, U256},
     providers::{Provider, ProviderBuilder},
-    rpc::types::Filter,
+    rpc::types::{request::TransactionRequest, Filter},
+    sol_types::SolCall,
 };
 use database::entity::{
     erc20_transfers::Erc20Transfers, evm_chains::EvmChains, evm_sync_logs::EvmSyncLogs,
@@ -50,6 +51,36 @@ impl Service<()> for ListenerService {
     }
 }
 
+alloy::sol! {
+    #[sol(rpc)]
+    interface IERC20 {
+        function symbol() external view returns (string);
+    }
+}
+
+pub async fn get_token_symbol(
+    chain_id: u64,
+    contract_address: &str,
+    db_pool: &Pool<Postgres>,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
+    let chain = EvmChains::fetch_by_id(chain_id, db_pool).await?;
+    let rpc_url = chain
+        .rpc_url
+        .ok_or_else(|| AppError::MissingEnvVar("RPC_URL for chain".into()))?;
+
+    let provider = ProviderBuilder::new().on_builtin(&rpc_url).await?;
+    let contract = Address::from_str(contract_address)?;
+
+    let symbol_call = IERC20::symbolCall {};
+    let tx = TransactionRequest::default()
+        .to(contract)
+        .input(symbol_call.abi_encode().into());
+
+    let result = provider.call(&tx).await?;
+    let decoded = IERC20::symbolCall::abi_decode_returns(&result, true)?;
+    Ok(decoded._0)
+}
+
 pub async fn fetch_and_save_logs(
     chain_id: u64,
     db_pool: Pool<Postgres>,
@@ -57,7 +88,6 @@ pub async fn fetch_and_save_logs(
     transfer_tx: broadcast::Sender<Erc20Transfer>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     loop {
-        // Get RPC URL from database for the specified chain
         let chain = EvmChains::fetch_by_id(chain_id, &db_pool).await?;
         let rpc_url = chain
             .rpc_url
@@ -74,7 +104,7 @@ pub async fn fetch_and_save_logs(
         }
 
         let from_block_number = match sync_log.last_synced_block_number as u64 {
-            0 => latest_block - 9, // TODO: consider other value
+            0 => latest_block - 9,
             block_number => block_number + 1_u64,
         };
 
@@ -97,7 +127,6 @@ pub async fn fetch_and_save_logs(
         let contract_address = Address::from_str(&address)?;
 
         for log in logs {
-            // Try to parse as ERC-20 Transfer event
             if let Some(transfer) = Erc20Transfer::from_log(&log) {
                 let block_number = log.block_number.ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "Missing block number")
@@ -124,7 +153,6 @@ pub async fn fetch_and_save_logs(
                 .await
                 .inspect_err(|error| eprintln!("Error saving ERC-20 transfer {error}"));
 
-                // Send the transfer to the broadcast channel for real-time updates
                 let _ = transfer_tx.send(transfer.clone());
             }
         }
@@ -143,7 +171,6 @@ pub async fn fetch_and_save_logs(
             Err(err) => eprintln!("{err}"),
         }
 
-        // Sleep for a short time before checking again
         sleep(Duration::from_secs(10)).await;
     }
 }

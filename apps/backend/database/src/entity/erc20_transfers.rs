@@ -1,7 +1,6 @@
 use alloy::primitives::Address;
 use bigdecimal::BigDecimal;
-use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Postgres, postgres::PgConnection, query, query_as, types::chrono};
+use sqlx::{Pool, Postgres, postgres::PgConnection, query_as, types::chrono};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct Erc20Transfers {
@@ -11,7 +10,7 @@ pub struct Erc20Transfers {
     pub log_index: i32,
     pub from_address: Vec<u8>,
     pub to_address: Vec<u8>,
-    pub amount: BigDecimal, // DECIMAL(78,0)
+    pub amount: BigDecimal,
     pub contract_address: String,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -36,7 +35,7 @@ impl Erc20Transfers {
         )
         .bind(block_number as i64)
         .bind(&transaction_hash[..])
-        .bind(0i32) // log_index, assuming single log for simplicity
+        .bind(0i32) 
         .bind(&from_address)
         .bind(&to_address)
         .bind(amount_decimal)

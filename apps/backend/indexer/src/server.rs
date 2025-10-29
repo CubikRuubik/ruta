@@ -39,6 +39,13 @@ pub struct TransferResponse {
 pub struct TokenSummaryResponse {
     pub contract_address: String,
     pub total_transferred: String,
+    pub symbol: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TokenSymbolResponse {
+    pub contract_address: String,
+    pub symbol: String,
 }
 
 impl From<Erc20Transfers> for TransferResponse {
@@ -62,6 +69,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/transfers", get(get_transfers))
         .route("/transfers/stream", get(stream_transfers))
         .route("/tokens/:address/summary", get(get_token_summary))
+        .route("/tokens/:address/symbol", get(get_token_symbol_endpoint))
         .with_state(state)
 }
 
@@ -73,6 +81,21 @@ async fn get_transfers(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let response = transfers.into_iter().map(TransferResponse::from).collect();
+    Ok(Json(response))
+}
+
+async fn get_token_symbol_endpoint(
+    axum::extract::Path(address): axum::extract::Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<TokenSymbolResponse>, StatusCode> {
+    let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let response = TokenSymbolResponse {
+        contract_address: address,
+        symbol,
+    };
     Ok(Json(response))
 }
 
@@ -105,9 +128,14 @@ async fn get_token_summary(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+        .await
+        .ok();
+
     let response = TokenSummaryResponse {
         contract_address: address,
         total_transferred: total.to_string(),
+        symbol,
     };
     Ok(Json(response))
 }
