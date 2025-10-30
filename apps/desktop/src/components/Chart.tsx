@@ -1,44 +1,149 @@
 import { FC } from "react";
-import { tokenColors, transfers } from "../mocks/transfers";
+import { useTransferStore } from "../store/transfers";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LabelList,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts";
 
 export const Chart: FC = () => {
+  const { transfers } = useTransferStore();
+
+  const amountByBlock = transfers.reduce<Record<number, number>>((acc, t) => {
+    const block = t.block_number;
+    const amount = parseFloat(t.amount);
+    acc[block] = (acc[block] || 0) + amount;
+    return acc;
+  }, {});
+
+  const barData = Object.entries(amountByBlock).map(([block, total]) => ({
+    block,
+    total,
+  }));
+
+  barData.sort((a, b) => Number(a.block) - Number(b.block));
+
+  const countByBlock = transfers.reduce<Record<number, number>>((acc, t) => {
+    const block = t.block_number;
+    acc[block] = (acc[block] || 0) + 1;
+    return acc;
+  }, {});
+
+  const pieData = Object.entries(countByBlock).map(([block, count]) => ({
+    name: `Block ${block}`,
+    value: count,
+  }));
+
+  const chartColors = [
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+    "var(--chart-5)",
+  ];
+
   return (
-    <Card className="bg-card text-card-foreground rounded">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">
-          Transfer Volume
+    <Card className="bg-card text-card-foreground rounded-lg space-y-4 max-h-[600px] p-0 pt-2">
+      <CardHeader className="my-0 py-0">
+        <CardTitle className="text-sm font-semibold">
+          Transfer Amount per Block
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-2">
-        {transfers.map((t, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="w-20 text-xs text-muted-foreground">{t.time}</span>
+      <CardContent className="p-2 py-0 h-[220px] my-0">
+        <ResponsiveContainer width="100%" height="100%" maxHeight={220}>
+          <BarChart
+            data={barData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+          >
+            <XAxis
+              dataKey="block"
+              fontSize={9}
+              tick={{ fill: "#888" }}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="left"
+              orientation="left"
+              tick={{ fill: "#888", fontSize: 10 }}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="left"
+              axisLine={false}
+              tick={false}
+              tickLine={false}
+              label={{
+                value: "Total Amount",
+                angle: -90,
+                position: "insideRight",
+                offset: 0,
+                fontSize: 11,
+                fill: "#888",
+              }}
+            />
+            <Tooltip />
+            <Bar dataKey="total" radius={[3, 3, 0, 0]}>
+              <LabelList
+                dataKey="total"
+                position="top"
+                fontSize={9}
+                fill="#ccc"
+                formatter={(val: number) =>
+                  val.toLocaleString("en-US", { maximumFractionDigits: 0 })
+                }
+              />
+              {barData.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={chartColors[index % chartColors.length]}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
 
-            <div className="flex-1 h-3 bg-muted rounded">
-              <div
-                className={`h-3 rounded ${tokenColors[t.token]}`}
-                style={{ width: `${Math.floor(Math.random() * 100 + 40)}px` }}
-              ></div>
-            </div>
+      <CardHeader className="py-0 my-0">
+        <CardTitle className="text-sm font-semibold py-0">
+          Transactions per Block
+        </CardTitle>
+      </CardHeader>
 
-            <span
-              className={`px-2 py-0.5 text-xs rounded min-w-[60px] text-center ${
-                tokenColors[t.token]
-              }`}
+      <CardContent className="p-0 h-[220px] my-0 text-xs">
+        <ResponsiveContainer width="100%" height="100%" maxHeight={220}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={80}
+              label={(entry: { name: string }) => entry.name}
             >
-              {t.token}
-            </span>
-          </div>
-        ))}
-
-        <div className="pt-2 text-xs text-muted-foreground flex flex-wrap items-center gap-2">
-          <span>Legend:</span>
-          <span className="bg-green-500/70 px-1 rounded text-white">USDT</span>
-          <span className="bg-blue-500/70 px-1 rounded text-white">USDC</span>
-          <span className="bg-yellow-500/70 px-1 rounded text-black">DAI</span>
-        </div>
+              {pieData.map((_, index) => (
+                <Cell
+                  key={`cell-pie-${index}`}
+                  fill={chartColors[index % chartColors.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(val: number) => `${val} txs`}
+              labelFormatter={(label) => `${label}`}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   );

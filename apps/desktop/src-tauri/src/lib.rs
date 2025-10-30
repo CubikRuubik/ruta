@@ -1,66 +1,120 @@
-use std::time::Duration;
-use serde::Serialize;
-use schemars::{schema_for, JsonSchema};
-// mod schemas;
-// use schemas::get_all_schemas;
-// mod ts_generator;
-// use ts_generator::write_ts_types;
+use serde::{Serialize, Deserialize};
+use futures_util::StreamExt;
+use tauri::{async_runtime, AppHandle, Emitter, State};
+use std::{collections::HashSet, sync::{Arc, Mutex}};
+use tokio::time::{sleep, Duration};
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Transfer {
-    time: String,
-    from: String,
-    to: String,
-    token: String,
+    id: i64,
+    block_number: i64,
+    transaction_hash: String,
+    log_index: i32,
+    from_address: String,
+    to_address: String,
+    amount: String,
+    contract_address: String,
+    created_at: Option<String>,
 }
 
-use tauri::{async_runtime, AppHandle, Emitter};
-use reqwest::Client;
+struct SseState {
+    running: bool,
+}
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
 #[tauri::command]
-async fn start_listening_sse(app: AppHandle, url: String) -> Result<(), String> {
-async_runtime::spawn(async move {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| e.to_string());
+async fn start_listening_sse(
+    app: AppHandle,
+    state: State<'_, Arc<Mutex<SseState>>>,
+) -> Result<(), String> {
+    let state_clone = state.inner().clone();
+    let app_clone = app.clone();
 
-        let client = match client {
-            Ok(c) => c,
-            Err(err) => {
-                let _ = app.emit("sse-error", format!("Error in creating client: {}", err));
-                return;
-            }
-        };
+    {
+        let mut sse_state = state_clone.lock().unwrap();
+        if sse_state.running {
+            return Ok(());
+        }
+        sse_state.running = true;
+    }
 
-        let resp = match client.get(&url).send().await {
-            Ok(r) => r,
-            Err(err) => {
-                let _ = app.emit("sse-error", format!("Error in getting response: {}", err));
-                return;
-            }
-        };
+    println!("Starting listening SSE");
 
-        let body = match resp.text().await {
-            Ok(b) => b,
-            Err(err) => {
-                let _ = app.emit("sse-error", format!("Error in getting body: {}", err));
-                return;
-            }
-        };
+    async_runtime::spawn(async move {
+        let url = "http://localhost:3000/transfers/stream";
 
-        for line in body.lines() {
-            if line.starts_with("data: ") {
-                let payload = line.trim_start_matches("data: ");
-                if let Err(err) = app.emit("sse-update", payload.to_string()) {
-                    eprintln!("Error in emitting event: {:?}", err);
+        let mut retries = 10;
+
+        while retries > 0 {
+            let client = match reqwest::Client::builder()
+                .timeout(Duration::from_secs(60))
+                .build()
+            {
+                Ok(c) => c,
+                Err(err) => {
+                    let _ = app_clone.emit("sse-error", format!("Error creating client: {}", err));
+                    return;
+                }
+            };
+
+            let resp = match client.get(url).send().await {
+                Ok(r) => r,
+                Err(err) => {
+                    let _ = app_clone.emit("sse-error", format!("Error sending request: {}", err));
+                    retries -= 1;
+                    sleep(Duration::from_secs(2)).await;
+                    continue;
+                }
+            };
+
+            let mut stream = resp.bytes_stream();
+            let mut buffer = Vec::new();
+            let mut seen = HashSet::new();
+
+            while let Some(item) = stream.next().await {
+                println!("Received item: {item:?}");
+
+                match item {
+                    Ok(chunk) => {
+                        buffer.extend_from_slice(&chunk);
+
+                        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+                            let line = buffer.drain(..=pos).collect::<Vec<u8>>();
+
+                            if buffer.len() > 1024 * 1024 { 
+                                buffer.clear();
+                                println!("Buffer cleared due to size limit");
+                            }
+
+                            if let Ok(line_str) = String::from_utf8(line) {
+                                let line_str = line_str.trim();
+                                if !line_str.is_empty() && !line_str.contains(": keep-alive") {
+                                    let data = line_str.strip_prefix("data: ").unwrap_or(line_str);
+                                    if seen.insert(data.to_string()) {
+                                        if let Ok(transfer) = serde_json::from_str::<Transfer>(data) {
+                                            let _ = app_clone.emit("sse-update", transfer);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        let _ = app_clone.emit("sse-error", format!("Stream error: {}", err));
+                        retries -= 1;
+                        sleep(Duration::from_secs(2)).await;
+                        break; 
+                    }
                 }
             }
         }
+
+        let mut sse_state = state_clone.lock().unwrap();
+        sse_state.running = false;
     });
 
     Ok(())
@@ -77,35 +131,39 @@ async fn stop_listening_sse(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn get_initial_data() -> Result<Vec<Transfer>, String> {
+    let url = "http://localhost:3000/transfers";
 
-    //TODO : Replace with actual data
-    let data = vec![
-        Transfer { time: "2025-10-02 10:15".to_string(), from: "0xAlice".to_string(), to: "0xBob".to_string(), token: "USDT".to_string() },
-        Transfer { time: "2025-10-02 10:17".to_string(), from: "0xEve".to_string(), to: "0xCarl".to_string(), token: "USDC".to_string() },
-        Transfer { time: "2025-10-02 10:19".to_string(), from: "0xDan".to_string(), to: "0xMike".to_string(), token: "DAI".to_string() },
-        Transfer { time: "2025-10-02 10:21".to_string(), from: "0xTom".to_string(), to: "0xSue".to_string(), token: "USDT".to_string() },
-    ];
-    Ok(data)
+    println!("Sending GET request to {}", url);
+
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| format!("Error fetching data: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Error fetching data by server: {}", response.status()));
+    }
+
+    let text = response.text().await.map_err(|e| format!("Error reading response text: {}", e))?;
+
+    let transfers: Vec<Transfer> = serde_json::from_str(&text)
+        .map_err(|e| format!("Error parsing JSON: {}", e))?;
+
+    Ok(transfers)
 }
-
-#[tauri::command]
-fn get_transfer_schema() -> String {
-    let schema = schema_for!(Transfer);
-    serde_json::to_string(&schema).unwrap()
-}
-
-// #[tauri::command]
-// fn schemas() -> serde_json::Value {
-//     get_all_schemas()
-// }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // ts_generator::write_ts_types("gen").unwrap();
+    use std::sync::Arc;
 
     tauri::Builder::default()
+        .manage(Arc::new(Mutex::new(SseState { running: false })))
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_initial_data, get_transfer_schema ])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            get_initial_data,
+            start_listening_sse,
+            stop_listening_sse
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

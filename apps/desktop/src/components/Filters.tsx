@@ -7,52 +7,46 @@ import {
 } from "./ui/Select";
 import { useFilterStore } from "../store/filters";
 import { Input } from "./ui/Input";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/Popover";
-import { CalendarIcon } from "lucide-react";
-import { useState } from "react";
-import { Calendar } from "./ui/Calendar";
-import { format } from "date-fns";
+// import { Popover, PopoverContent, PopoverTrigger } from "./ui/Popover";
+// import { CalendarIcon } from "lucide-react";
+// import { useState } from "react";
+// import { Calendar } from "./ui/Calendar";
+// import { format } from "date-fns";
 
 export const Filters = () => {
   const {
-    token,
-    address,
-    dateFrom,
-    dateTo,
-    setToken,
-    setAddress,
-    setDateFrom,
-    setDateTo,
+    sort,
+    block,
+    setSort,
+    setBlock,
+    // setDateFrom,
+    // setDateTo,
   } = useFilterStore();
 
-  const [openFrom, setOpenFrom] = useState(false);
-  const [openTo, setOpenTo] = useState(false);
-
-  console.log(dateFrom, dateTo);
+  // const [openFrom, setOpenFrom] = useState(false);
+  // const [openTo, setOpenTo] = useState(false);
 
   return (
     <div className="flex gap-4 mb-4 flex-wrap">
-      <Select value={token} onValueChange={setToken}>
+      <Select value={sort} onValueChange={setSort}>
         <SelectTrigger className="w-32">
           <SelectValue placeholder="Select Token" />
         </SelectTrigger>
         <SelectContent className="bg-(--card) text-(--card-foreground) dark:bg-(--card) dark:text-(--card-foreground)">
-          <SelectItem value="All">All</SelectItem>
-          <SelectItem value="USDT">USDT</SelectItem>
-          <SelectItem value="USDC">USDC</SelectItem>
-          <SelectItem value="DAI">DAI</SelectItem>
+          <SelectItem value="asc">ASC</SelectItem>
+          <SelectItem value="desc">DESC</SelectItem>
         </SelectContent>
       </Select>
 
       <Input
         type="text"
-        placeholder="Address"
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
+        placeholder="Block"
+        value={block || ""}
+        onChange={(e) => setBlock(Number(e.target.value))}
         className="w-64"
       />
 
-      <Popover open={openFrom} onOpenChange={setOpenFrom}>
+      {/* <Popover open={openFrom} onOpenChange={setOpenFrom}>
         <PopoverTrigger asChild>
           <button
             className="flex items-center justify-between w-40 px-3 py-2 text-sm border rounded bg-input text-foreground"
@@ -74,9 +68,9 @@ export const Filters = () => {
             }}
           />
         </PopoverContent>
-      </Popover>
+      </Popover> */}
 
-      <Popover open={openTo} onOpenChange={setOpenTo}>
+      {/* <Popover open={openTo} onOpenChange={setOpenTo}>
         <PopoverTrigger asChild>
           <button
             className="flex items-center justify-between w-40 px-3 py-2 text-sm border rounded bg-input text-foreground"
@@ -98,7 +92,7 @@ export const Filters = () => {
             }}
           />
         </PopoverContent>
-      </Popover>
+      </Popover> */}
     </div>
   );
 };

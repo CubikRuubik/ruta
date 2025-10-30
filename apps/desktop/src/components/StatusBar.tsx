@@ -8,8 +8,11 @@ export const StatusBar: FC = () => {
     ? "Connected"
     : "Disconnected";
   const LIVE_UPDATES: "ON" | "OFF" = unlisten ? "ON" : "OFF";
+
   const LAST_BLOCK = transfers.length
-    ? transfers[transfers.length - 1].time
+    ? transfers.reduce((max, t) => {
+        return t.block_number > max ? t.block_number : max;
+      }, 0)
     : "—";
 
   const statusColor = STATUS === "Connected" ? "bg-green-500" : "bg-red-500";
