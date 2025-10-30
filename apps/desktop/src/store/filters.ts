@@ -1,23 +1,25 @@
 import { create } from "zustand";
 
+export type Sort = "asc" | "desc";
+
 interface FilterState {
-  token: string;
-  address: string;
+  sort: Sort;
+  block: number;
   dateFrom: string;
   dateTo: string;
-  setToken: (token: string) => void;
-  setAddress: (address: string) => void;
+  setSort: (sort: Sort) => void;
+  setBlock: (block: number) => void;
   setDateFrom: (date: string) => void;
   setDateTo: (date: string) => void;
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
-  token: "All",
-  address: "",
+  sort: "asc",
+  block: 0,
   dateFrom: "",
   dateTo: "",
-  setToken: (token) => set({ token }),
-  setAddress: (address) => set({ address }),
+  setSort: (sort) => set({ sort }),
+  setBlock: (block) => set({ block }),
   setDateFrom: (date) => set({ dateFrom: date }),
   setDateTo: (date) => set({ dateTo: date }),
 }));

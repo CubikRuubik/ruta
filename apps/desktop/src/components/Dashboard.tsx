@@ -10,12 +10,18 @@ export default function Dashboard() {
     useTransferStore();
 
   useEffect(() => {
-    fetchInitialData();
-    startListening();
+    const init = async () => {
+      await fetchInitialData();
+      await startListening();
+    };
+
+    init();
+
     return () => {
       stopListening();
     };
   }, []);
+
   return (
     <div className="p-4 h-full bg-background text-foreground font-mono">
       <h1 className="text-2xl font-bold mb-4 text-center">RUTA Dashboard</h1>

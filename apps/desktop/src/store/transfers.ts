@@ -2,11 +2,16 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
-interface Transfer {
-  time: string;
-  from: string;
-  to: string;
-  token: string;
+export interface Transfer {
+  id: number;
+  block_number: number;
+  transaction_hash: string;
+  log_index: number;
+  from_address: string;
+  to_address: string;
+  amount: string;
+  contract_address: string;
+  created_at?: string | null;
 }
 
 interface TransferStore {
@@ -33,12 +38,16 @@ export const useTransferStore = create<TransferStore>((set, get) => ({
   },
 
   startListening: async () => {
-    if (get().unlisten) return;
+    if (typeof get().unlisten === "function") return;
 
     try {
+      await invoke("start_listening_sse");
+
       const unlistenFn = await listen<Transfer>("sse-update", (event) => {
+        console.log("Received SSE event:", event.payload);
         set({ transfers: [...get().transfers, event.payload] });
       });
+
       set({ unlisten: unlistenFn });
     } catch (err) {
       console.error("Failed to start SSE listener:", err);
