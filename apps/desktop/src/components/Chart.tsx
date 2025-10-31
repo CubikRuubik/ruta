@@ -98,8 +98,10 @@ export const Chart: FC = () => {
                 position="top"
                 fontSize={9}
                 fill="#ccc"
-                formatter={(val: number) =>
-                  val.toLocaleString("en-US", { maximumFractionDigits: 0 })
+                formatter={(val) =>
+                  typeof val === "number"
+                    ? val.toLocaleString("en-US", { maximumFractionDigits: 0 })
+                    : val
                 }
               />
               {barData.map((_, index) => (
@@ -129,7 +131,7 @@ export const Chart: FC = () => {
               cx="50%"
               cy="50%"
               outerRadius={80}
-              label={(entry: { name: string }) => entry.name}
+              label={(entry: { name?: string }) => entry.name ?? ""}
             >
               {pieData.map((_, index) => (
                 <Cell
