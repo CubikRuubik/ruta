@@ -19,6 +19,10 @@ export const Filters = () => {
     block,
     setSort,
     setBlock,
+    addressFrom,
+    addressTo,
+    setAddressFrom,
+    setAddressTo,
     // setDateFrom,
     // setDateTo,
   } = useFilterStore();
@@ -43,6 +47,22 @@ export const Filters = () => {
         placeholder="Block"
         value={block || ""}
         onChange={(e) => setBlock(Number(e.target.value))}
+        className="w-64"
+      />
+
+      <Input
+        type="text"
+        placeholder="Address From"
+        value={addressFrom || ""}
+        onChange={(e) => setAddressFrom(e.target.value)}
+        className="w-64"
+      />
+
+      <Input
+        type="text"
+        placeholder="Address To"
+        value={addressTo || ""}
+        onChange={(e) => setAddressTo(e.target.value)}
         className="w-64"
       />
 

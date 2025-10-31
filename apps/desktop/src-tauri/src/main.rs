@@ -3,11 +3,10 @@
 
 use std::process::Command;
 use std::path::PathBuf;
-use std::thread;
 
 fn main() {
     #[cfg(target_os = "macos")]
-    let mut path: PathBuf = {
+    let path: PathBuf = {
         let mut p = std::env::current_exe().expect("failed to get current exe path");
         p.pop(); 
         p.pop(); 
@@ -16,7 +15,7 @@ fn main() {
     };
 
     #[cfg(target_os = "windows")]
-    let mut path: PathBuf = {
+    let path: PathBuf = {
         let mut p = std::env::current_exe().expect("failed to get current exe path");
         p.pop(); // target/release/
         p.push("indexer");

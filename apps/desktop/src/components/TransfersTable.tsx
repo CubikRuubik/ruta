@@ -11,14 +11,30 @@ import {
 import { useTransferStore } from "../store/transfers";
 
 export const TransfersTable: FC = () => {
-  const { sort: selectedSort, block: selectedBlock } = useFilterStore();
+  const {
+    sort: selectedSort,
+    block: selectedBlock,
+    addressFrom,
+    addressTo,
+  } = useFilterStore();
   const { transfers } = useTransferStore();
 
   const filteredTransfers = transfers.filter((t) => {
-    if (!selectedBlock) return true;
-    const blockStr = t.block_number.toString();
-    const searchStr = selectedBlock.toString();
-    return blockStr.startsWith(searchStr);
+    const block = String(t.block_number ?? "");
+    const from = String(t.from_address ?? "").toLowerCase();
+    const to = String(t.to_address ?? "").toLowerCase();
+
+    const matchesBlock = selectedBlock
+      ? String(block) === String(selectedBlock)
+      : true;
+
+    const matchesFrom = addressFrom
+      ? from.includes(addressFrom.toLowerCase())
+      : true;
+
+    const matchesTo = addressTo ? to.includes(addressTo.toLowerCase()) : true;
+
+    return matchesBlock && matchesFrom && matchesTo;
   });
 
   const sortedTransfers = filteredTransfers.sort((a, b) => {

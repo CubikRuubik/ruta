@@ -13,9 +13,11 @@ import {
   PieChart,
   Pie,
 } from "recharts";
+import { useFilterStore } from "../store/filters";
 
 export const Chart: FC = () => {
   const { transfers } = useTransferStore();
+  const { block: selectedBlock } = useFilterStore();
 
   const amountByBlock = transfers.reduce<Record<number, number>>((acc, t) => {
     const block = t.block_number;
@@ -24,12 +26,13 @@ export const Chart: FC = () => {
     return acc;
   }, {});
 
-  const barData = Object.entries(amountByBlock).map(([block, total]) => ({
+  let barData = Object.entries(amountByBlock).map(([block, total]) => ({
     block,
     total,
   }));
 
   barData.sort((a, b) => Number(a.block) - Number(b.block));
+  barData = barData.slice(-5);
 
   const countByBlock = transfers.reduce<Record<number, number>>((acc, t) => {
     const block = t.block_number;
@@ -37,10 +40,40 @@ export const Chart: FC = () => {
     return acc;
   }, {});
 
-  const pieData = Object.entries(countByBlock).map(([block, count]) => ({
-    name: `Block ${block}`,
-    value: count,
-  }));
+  let pieData;
+
+  if (selectedBlock) {
+    const filtered = transfers.filter((t) => t.block_number === selectedBlock);
+
+    const amountByAddress = filtered.reduce<Record<string, number>>(
+      (acc, t) => {
+        const addr = t.from_address || "Unknown";
+        const amount = parseFloat(t.amount);
+        acc[addr] = (acc[addr] || 0) + amount;
+        return acc;
+      },
+      {}
+    );
+
+    pieData = Object.entries(amountByAddress).map(([addr, total]) => ({
+      name:
+        "From " +
+        (addr.length > 12 ? `${addr.slice(0, 8)}...${addr.slice(-4)}` : addr),
+      value: total,
+    }));
+  } else {
+    pieData = Object.entries(countByBlock).map(([block, count]) => ({
+      name: `Block ${block}`,
+      value: count,
+    }));
+
+    pieData.sort(
+      (a, b) =>
+        Number(a.name.replace("Block ", "")) -
+        Number(b.name.replace("Block ", ""))
+    );
+    pieData = pieData.slice(-5);
+  }
 
   const chartColors = [
     "var(--chart-1)",
@@ -117,7 +150,9 @@ export const Chart: FC = () => {
 
       <CardHeader className="py-0 my-0">
         <CardTitle className="text-sm font-semibold py-0">
-          Transactions per Block
+          {selectedBlock
+            ? `Transfers in Block ${selectedBlock}`
+            : "Transactions per Block"}
         </CardTitle>
       </CardHeader>
 
@@ -141,7 +176,11 @@ export const Chart: FC = () => {
               ))}
             </Pie>
             <Tooltip
-              formatter={(val: number) => `${val} txs`}
+              formatter={(val: number) =>
+                selectedBlock
+                  ? `${val.toLocaleString("en-US")} total amount`
+                  : `${val} txs`
+              }
               labelFormatter={(label) => `${label}`}
             />
           </PieChart>
