@@ -198,12 +198,13 @@ pub async fn fetch_and_save_logs(
                             log_index: latest_transfer.log_index,
                             from_address: hex::encode(&latest_transfer.from_address),
                             to_address: hex::encode(&latest_transfer.to_address),
-                            amount: (latest_transfer.amount.clone()
-                                / sqlx::types::BigDecimal::from(10u64.pow(decimals as u32)))
-                            .to_string(),
+                            amount: (latest_transfer.amount).to_string(),
                             contract_address: latest_transfer.contract_address.clone(),
                             created_at: latest_transfer.created_at.map(|dt| dt.to_rfc3339()),
                         };
+                        if transfer_response.amount == "0" {
+                            continue;
+                        }
                         let _ = transfer_tx.send(transfer_response);
                     }
                 }
