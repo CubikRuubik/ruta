@@ -1,0 +1,25 @@
+[package]
+name = "ruta"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy = { workspace = true }
+database = { path = "apps/backend/database" }
+indexer = { path = "apps/backend/indexer" }
+tokio = { workspace = true }
+
+[workspace]
+members = [
+    "apps/backend/database",
+    "apps/desktop/src-tauri",
+    "apps/backend/indexer"
+]
+
+[workspace.dependencies]
+alloy = { version = "0.7.2", features = ["full"] }
+serde = "1.0.215"
+serde_json = "1.0.133"
+sqlx = { version = "0.8", features = [ "bigdecimal", "chrono", "migrate", "postgres", "runtime-tokio", "tls-native-tls" ] }
+thiserror = "2.0.6"
+tokio = { version = "1.0", features = ["full"] }
