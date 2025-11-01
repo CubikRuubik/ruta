@@ -24,7 +24,7 @@ RUTA is a comprehensive desktop application built with Tauri, React, and Rust th
 - **REST API**: Axum-based HTTP server with SSE support
 - **Migration System**: Automatic database schema management
 
-### Frontend (React/TypeScript) //TODO: check if this is correct
+### Frontend (React/TypeScript)
 
 - **Tauri Integration**: Native desktop capabilities
 - **Real-time Updates**: SSE-powered live data streaming
@@ -74,10 +74,10 @@ The application uses PostgreSQL with the following main tables:
 
 ### Prerequisites
 
-- **Rust**: Latest stable version (2024 edition)
+- **Rust**: Latest stable version
 - **Node.js**: v18 or higher
 - **PostgreSQL**: v12 or higher
-- **Tauri CLI**: `npm install -g @tauri-apps/cli` //TODO: check if this is correct
+- **Tauri CLI**: `npm install @tauri-apps/cli --save-dev`
 
 ### Installation
 
@@ -91,7 +91,7 @@ The application uses PostgreSQL with the following main tables:
 2. **Install dependencies**
 
    ```bash
-   npm run install:all // TODO: check if this is correct
+   npm run install:all
    ```
 
 3. **Set up PostgreSQL database**
@@ -167,4 +167,4 @@ Add contract addresses to the `CONTRACT_ADDRESSES` environment variable (comma-s
 - **Frontend**: React, TypeScript, Tailwind CSS, Radix UI
 - **Desktop**: Tauri
 - **Database**: PostgreSQL
-- **Build Tools**: Cargo, Vite, Rollup //TODO: check if this is true
+- **Build Tools**: Cargo, Vite, Rollup,Tauri CLI
