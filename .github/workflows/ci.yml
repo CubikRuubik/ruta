@@ -17,12 +17,28 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          # основні бібліотеки для glib/gtk/webkit
+          if apt-cache show libwebkit2gtk-4.1-dev >/dev/null 2>&1; then
+            sudo apt-get install -y \
+              libglib2.0-dev \
+              libgtk-3-dev \
+              libwebkit2gtk-4.1-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+          elif apt-cache show libwebkitgtk-6.0-dev >/dev/null 2>&1; then
+            sudo apt-get install -y \
+              libglib2.0-dev \
+              libgtk-3-dev \
+              libwebkitgtk-6.0-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+          else
+            sudo apt-get install -y \
+              libglib2.0-dev \
+              libgtk-3-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
