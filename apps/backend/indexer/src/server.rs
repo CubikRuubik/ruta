@@ -2,11 +2,11 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::sse::{Event, Sse},
-    response:: Json,
+    response::Json,
     routing::get,
     Router,
 };
-use futures::stream:: Stream;
+use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use sqlx::Pool;
 use std::{convert::Infallible, time::Duration};
