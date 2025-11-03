@@ -6,7 +6,6 @@ use axum::serve;
 use database::{
     entity::evm_chains::EvmChains, entity::evm_sync_logs::EvmSyncLogs, initialize_database,
 };
-use error::AppError;
 use service::ListenerService;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;

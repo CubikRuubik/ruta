@@ -18,7 +18,7 @@ async fn create_pool(max_connections: u32) -> Result<Pool<Postgres>, sqlx::Error
         .await
 }
 
-async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
+pub async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
     let migrator = Migrator::new(std::path::Path::new("./migrations")).await?;
     migrator.run(pool).await?;
     Ok(())
