@@ -177,3 +177,78 @@ async fn get_token_summary(
     };
     Ok(Json(response))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+    use axum::{body::Body, http::Request};
+    use sqlx::postgres::PgPoolOptions;
+    use tokio::sync::broadcast;
+    use tower::ServiceExt;
+
+    fn mock_app_state() -> AppState {
+        let (tx, _rx) = broadcast::channel(10);
+
+        let db_pool = PgPoolOptions::new()
+            .connect_lazy("postgres://postgres:password@localhost/fake")
+            .unwrap();
+
+        AppState {
+            db_pool,
+            transfer_tx: tx,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_transfers_is_found() {
+        let state = mock_app_state();
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/transfers")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_transfers_stream_returns_event_stream() {
+        let (tx, _rx) = tokio::sync::broadcast::channel(10);
+
+        let db_pool = PgPoolOptions::new()
+            .connect_lazy("postgres://user:pass@localhost/fake_db")
+            .unwrap();
+
+        let state = AppState {
+            db_pool,
+            transfer_tx: tx,
+        };
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/transfers/stream")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        assert!(content_type.contains("text/event-stream"));
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+}
