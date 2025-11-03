@@ -211,7 +211,7 @@ pub async fn fetch_and_save_logs(
         }
 
         let _ = sync_log
-            .update_last_synced_block_number(to_block_number, &mut *tx)
+            .update_last_synced_block_number(to_block_number, &mut tx)
             .await
             .inspect_err(|error| eprintln!("Error updating last_synced_block_number {error}"));
 
