@@ -35,7 +35,7 @@ impl Erc20Transfers {
         )
         .bind(block_number as i64)
         .bind(&transaction_hash[..])
-        .bind(0i32) 
+        .bind(0i32)
         .bind(&from_address)
         .bind(&to_address)
         .bind(amount_decimal)

@@ -1,7 +1,10 @@
-use serde::{Serialize, Deserialize};
 use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 use tauri::{async_runtime, AppHandle, Emitter, State};
-use std::{collections::HashSet, sync::{Arc, Mutex}};
 use tokio::time::{sleep, Duration};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -85,7 +88,7 @@ async fn start_listening_sse(
                         while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
                             let line = buffer.drain(..=pos).collect::<Vec<u8>>();
 
-                            if buffer.len() > 1024 * 1024 { 
+                            if buffer.len() > 1024 * 1024 {
                                 buffer.clear();
                                 println!("Buffer cleared due to size limit");
                             }
@@ -95,7 +98,8 @@ async fn start_listening_sse(
                                 if !line_str.is_empty() && !line_str.contains(": keep-alive") {
                                     let data = line_str.strip_prefix("data: ").unwrap_or(line_str);
                                     if seen.insert(data.to_string()) {
-                                        if let Ok(transfer) = serde_json::from_str::<Transfer>(data) {
+                                        if let Ok(transfer) = serde_json::from_str::<Transfer>(data)
+                                        {
                                             let _ = app_clone.emit("sse-update", transfer);
                                         }
                                     }
@@ -107,7 +111,7 @@ async fn start_listening_sse(
                         let _ = app_clone.emit("sse-error", format!("Stream error: {}", err));
                         retries -= 1;
                         sleep(Duration::from_secs(2)).await;
-                        break; 
+                        break;
                     }
                 }
             }
@@ -140,13 +144,19 @@ async fn get_initial_data() -> Result<Vec<Transfer>, String> {
         .map_err(|e| format!("Error fetching data: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Error fetching data by server: {}", response.status()));
+        return Err(format!(
+            "Error fetching data by server: {}",
+            response.status()
+        ));
     }
 
-    let text = response.text().await.map_err(|e| format!("Error reading response text: {}", e))?;
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("Error reading response text: {}", e))?;
 
-    let transfers: Vec<Transfer> = serde_json::from_str(&text)
-        .map_err(|e| format!("Error parsing JSON: {}", e))?;
+    let transfers: Vec<Transfer> =
+        serde_json::from_str(&text).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
     Ok(transfers)
 }

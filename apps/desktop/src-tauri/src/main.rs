@@ -1,15 +1,15 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
     #[cfg(target_os = "macos")]
     let path: PathBuf = {
         let mut p = std::env::current_exe().expect("failed to get current exe path");
-        p.pop(); 
-        p.pop(); 
+        p.pop();
+        p.pop();
         p.push("Resources/indexer");
         p
     };
