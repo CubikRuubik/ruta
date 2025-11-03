@@ -25,11 +25,6 @@ struct SseState {
 }
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 async fn start_listening_sse(
     app: AppHandle,
     state: State<'_, Arc<Mutex<SseState>>>,
@@ -169,11 +164,90 @@ pub fn run() {
         .manage(Arc::new(Mutex::new(SseState { running: false })))
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             get_initial_data,
             start_listening_sse,
             stop_listening_sse
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use futures_util::stream;
+    use httpmock::prelude::*;
+    use tokio;
+    use tokio::runtime::Runtime;
+
+    #[tokio::test]
+    async fn test_get_initial_data_success() {
+        let server = MockServer::start();
+
+        let transfers_json = r#"[{
+            "id": 1,
+            "block_number": 12345,
+            "transaction_hash": "0xabc",
+            "log_index": 1,
+            "from_address": "0xfrom",
+            "to_address": "0xto",
+            "amount": "1000",
+            "contract_address": "0xcontract",
+            "created_at": null
+        }]"#;
+
+        server.mock(|when, then| {
+            when.method(GET).path("/transfers");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(transfers_json);
+        });
+
+        let url = format!("{}/transfers", server.base_url());
+        let response = reqwest::get(&url).await.unwrap();
+        let text = response.text().await.unwrap();
+        let transfers: Vec<Transfer> = serde_json::from_str(&text).unwrap();
+
+        assert_eq!(transfers.len(), 1);
+        assert_eq!(transfers[0].from_address, "0xfrom");
+    }
+
+    #[test]
+    fn test_sse_parsing() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let json_1 = "data: {\"id\":1,\"block_number\":10,\"transaction_hash\":\"abc\",\"log_index\":0,   \"from_address\":\"A\",\"to_address\":\"B\",\"amount\":\"100\",\"contract_address\":\"X\"}\n";
+            let json_2 = "data: {\"id\":2,\"block_number\":11,\"transaction_hash\":\"def\",\"log_index\":1,\"from_address\":\"C\",\"to_address\":\"D\",\"amount\":\"200\",\"contract_address\":\"Y\"}\n";
+
+            let fake_stream = stream::iter(vec![
+                Ok::<_, reqwest::Error>(Bytes::from(json_1)),
+                Ok(Bytes::from(json_2)),
+            ]);
+
+            let mut buffer = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+
+            let mut count = 0;
+            tokio::pin!(fake_stream);
+
+            while let Some(item) = fake_stream.next().await {
+                buffer.extend_from_slice(&item.unwrap());
+
+                while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+                    let line = buffer.drain(..=pos).collect::<Vec<u8>>();
+                    let line_str = String::from_utf8(line).unwrap();
+                    if let Some(data) = line_str.strip_prefix("data: ") {
+                        if seen.insert(data.to_string()) {
+                            if let Ok(_transfer) = serde_json::from_str::<Transfer>(data) {
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            assert_eq!(count, 2);
+        });
+    }
 }
