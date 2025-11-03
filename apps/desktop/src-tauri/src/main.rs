@@ -22,6 +22,14 @@ fn main() {
         p
     };
 
+    #[cfg(target_os = "linux")]
+    let current_p: PathBuf = {
+        let mut p = std::env::current_exe().expect("failed to get current exe path");
+        p.pop(); // target/release/
+        p.push("indexer");
+        p
+    };
+
     std::thread::spawn(move || {
         Command::new(current_p)
             .env("DATABASE_URL", "postgres://postgres:password@127.0.0.1:5432/indexer_db")
