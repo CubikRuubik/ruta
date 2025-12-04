@@ -1,0 +1,254 @@
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::sse::{Event, Sse},
+    response::Json,
+    routing::get,
+    Router,
+};
+use futures::stream::Stream;
+use serde::{Deserialize, Serialize};
+use sqlx::Pool;
+use std::{convert::Infallible, time::Duration};
+use tokio::sync::broadcast;
+use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
+
+use database::entity::erc20_transfers::Erc20Transfers;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db_pool: Pool<sqlx::Postgres>,
+    pub transfer_tx: broadcast::Sender<TransferResponse>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TransferResponse {
+    pub id: i64,
+    pub block_number: i64,
+    pub transaction_hash: String,
+    pub log_index: i32,
+    pub from_address: String,
+    pub to_address: String,
+    pub amount: String,
+    pub contract_address: String,
+    pub created_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TokenSummaryResponse {
+    pub contract_address: String,
+    pub total_transferred: String,
+    pub symbol: Option<String>,
+    pub decimals: Option<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TokenSymbolResponse {
+    pub contract_address: String,
+    pub symbol: String,
+}
+
+impl From<Erc20Transfers> for TransferResponse {
+    fn from(transfer: Erc20Transfers) -> Self {
+        Self {
+            id: transfer.id,
+            block_number: transfer.block_number,
+            transaction_hash: hex::encode(&transfer.transaction_hash),
+            log_index: transfer.log_index,
+            from_address: hex::encode(&transfer.from_address),
+            to_address: hex::encode(&transfer.to_address),
+            amount: transfer.amount.to_string(),
+            contract_address: transfer.contract_address,
+            created_at: transfer.created_at.map(|dt| dt.to_rfc3339()),
+        }
+    }
+}
+
+pub fn create_router(state: AppState) -> Router {
+    Router::new()
+        .route("/transfers", get(get_transfers))
+        .route("/transfers/stream", get(stream_transfers))
+        .route("/tokens/:address/summary", get(get_token_summary))
+        .route("/tokens/:address/symbol", get(get_token_symbol_endpoint))
+        .route("/tokens/summaries", get(get_all_token_summaries))
+        .with_state(state)
+}
+
+async fn get_transfers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TransferResponse>>, StatusCode> {
+    let transfers = Erc20Transfers::find_all(100, &state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let response = transfers.into_iter().map(TransferResponse::from).collect();
+    Ok(Json(response))
+}
+
+async fn get_all_token_summaries(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TokenSummaryResponse>>, StatusCode> {
+    use database::entity::evm_sync_logs::EvmSyncLogs;
+
+    let addresses = EvmSyncLogs::find_all_addresses(&state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut summaries = Vec::new();
+    for address in addresses {
+        let total = Erc20Transfers::sum_amounts_by_contract_address(&address, &state.db_pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+            .await
+            .ok();
+        let decimals = crate::service::get_token_decimals(1, &address, &state.db_pool)
+            .await
+            .ok();
+
+        summaries.push(TokenSummaryResponse {
+            contract_address: address,
+            total_transferred: total.to_string(),
+            symbol,
+            decimals,
+        });
+    }
+
+    Ok(Json(summaries))
+}
+
+async fn get_token_symbol_endpoint(
+    axum::extract::Path(address): axum::extract::Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<TokenSymbolResponse>, StatusCode> {
+    let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let response = TokenSymbolResponse {
+        contract_address: address,
+        symbol,
+    };
+    Ok(Json(response))
+}
+
+async fn stream_transfers(
+    State(state): State<AppState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = state.transfer_tx.subscribe();
+    let stream = BroadcastStream::new(rx);
+
+    let event_stream = stream.map(|transfer| match transfer {
+        Ok(transfer) => {
+            let data = serde_json::to_string(&transfer).unwrap_or_default();
+            Ok(Event::default().data(data))
+        }
+        Err(_) => Ok(Event::default().data("error")),
+    });
+
+    Sse::new(event_stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(Duration::from_secs(1))
+            .text("keep-alive"),
+    )
+}
+
+async fn get_token_summary(
+    axum::extract::Path(address): axum::extract::Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<TokenSummaryResponse>, StatusCode> {
+    let total = Erc20Transfers::sum_amounts_by_contract_address(&address, &state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let symbol = crate::service::get_token_symbol(1, &address, &state.db_pool)
+        .await
+        .ok();
+    let decimals = crate::service::get_token_decimals(1, &address, &state.db_pool)
+        .await
+        .ok();
+
+    let response = TokenSummaryResponse {
+        contract_address: address,
+        total_transferred: total.to_string(),
+        symbol,
+        decimals,
+    };
+    Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+    use axum::{body::Body, http::Request};
+    use sqlx::postgres::PgPoolOptions;
+    use tokio::sync::broadcast;
+    use tower::ServiceExt;
+
+    fn mock_app_state() -> AppState {
+        let (tx, _rx) = broadcast::channel(10);
+
+        let db_pool = PgPoolOptions::new()
+            .connect_lazy("postgres://postgres:password@localhost/fake")
+            .unwrap();
+
+        AppState {
+            db_pool,
+            transfer_tx: tx,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_transfers_is_found() {
+        let state = mock_app_state();
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/transfers")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_transfers_stream_returns_event_stream() {
+        let (tx, _rx) = tokio::sync::broadcast::channel(10);
+
+        let db_pool = PgPoolOptions::new()
+            .connect_lazy("postgres://user:pass@localhost/fake_db")
+            .unwrap();
+
+        let state = AppState {
+            db_pool,
+            transfer_tx: tx,
+        };
+        let app = create_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/transfers/stream")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        assert!(content_type.contains("text/event-stream"));
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+}

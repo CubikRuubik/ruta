@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE evm_sync_logs SET last_synced_block_number = $1 WHERE contract_address = $2 AND chain_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "57e0a4ca685672a1dbd3189b8f7c7b1ad3fca5e971ac4bfa31bc5acb65302b98"
+}

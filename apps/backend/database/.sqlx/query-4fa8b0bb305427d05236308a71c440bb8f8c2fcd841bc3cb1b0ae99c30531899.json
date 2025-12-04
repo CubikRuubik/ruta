@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO evm_chains (id, name, rpc_url, block_time) VALUES ($1, $2, $3, $4)\n             ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, rpc_url = EXCLUDED.rpc_url, block_time = EXCLUDED.block_time\n             RETURNING id, name, rpc_url, block_time",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "rpc_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "block_time",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4fa8b0bb305427d05236308a71c440bb8f8c2fcd841bc3cb1b0ae99c30531899"
+}
